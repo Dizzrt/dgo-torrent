@@ -14,9 +14,9 @@ var (
 	ErrInvalidBencode           = errors.New("invalid bencode")
 )
 
-func readDecimal(br *bufio.Reader) (int, int) {
-	isNegative := 1
-	val, count := 0, 1
+func readDecimal(br *bufio.Reader) (int64, int64) {
+	var isNegative int64 = 1
+	var val, count int64 = 0, 1
 
 	b, _ := br.ReadByte()
 	if b == '-' {
@@ -33,7 +33,7 @@ func readDecimal(br *bufio.Reader) (int, int) {
 			break
 		}
 
-		val = val*10 + int(b-'0')
+		val = val*10 + int64(b-'0')
 		b, _ = br.ReadByte()
 		count++
 	}
@@ -43,7 +43,7 @@ func readDecimal(br *bufio.Reader) (int, int) {
 
 // TODO func encodeInt(val int) (string,int){}
 
-func decodeInt(br *bufio.Reader) (int, error) {
+func decodeInt(br *bufio.Reader) (int64, error) {
 	b, err := br.ReadByte()
 	if err != nil {
 		return 0, nil
@@ -84,7 +84,7 @@ func decodeStr(br *bufio.Reader) (string, error) {
 	}
 
 	buf := make([]byte, strLen)
-	_, err = io.ReadAtLeast(br, buf, strLen)
+	_, err = io.ReadAtLeast(br, buf, int(strLen))
 	if err != nil {
 		return "", err
 	}
