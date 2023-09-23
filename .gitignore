@@ -19,3 +19,9 @@
 
 # Go workspace file
 go.work
+
+# Apple Desktop services store
+.DS_Store
+
+# Test
+test/out
