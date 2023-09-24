@@ -3,7 +3,10 @@ package bencode
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
+	"math"
+	"strconv"
 )
 
 var (
@@ -41,7 +44,27 @@ func readDecimal(br *bufio.Reader) (int64, int64) {
 	return isNegative * val, count
 }
 
-// TODO func encodeInt(val int) (string,int){}
+func encodeInt64(val int64) (string, int) {
+	if val == 0 {
+		return "i0e", 3
+	}
+
+	ret := "i"
+	count := 1
+	if val < 0 {
+		val = -val
+		ret = "i-"
+		count = 2
+	}
+
+	ret += strconv.FormatInt(val, 10)
+	count += int(math.Log10(float64(val))) + 1
+
+	ret += "e"
+	count++
+
+	return ret, count
+}
 
 func decodeInt(br *bufio.Reader) (int64, error) {
 	b, err := br.ReadByte()
@@ -66,7 +89,18 @@ func decodeInt(br *bufio.Reader) (int64, error) {
 	return res, nil
 }
 
-// TODO func encodeStr(val string) (string, int) {}
+func encodeStr(val string) (string, int) {
+	count := len(val)
+	ret := fmt.Sprintf("%d:%s", count, val)
+
+	if count == 0 {
+		count = 2
+	} else {
+		count = count + int(math.Log10(float64(count))) + 2
+	}
+
+	return ret, count
+}
 
 func decodeStr(br *bufio.Reader) (string, error) {
 	strLen, len := readDecimal(br)

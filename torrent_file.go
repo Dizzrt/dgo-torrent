@@ -1,6 +1,7 @@
 package dgotorrent
 
 import (
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 )
 
 const PIECE_LEN = 20
+const INFO_HASH_LEN = 20
 
 var (
 	ErrInvalidTorrentFile = errors.New("invalid torrent file")
@@ -27,6 +29,7 @@ type TorrentInfo struct {
 	MutiFiles   []TorrentMutiFile
 	PieceLength int64
 	Pieces      [][PIECE_LEN]byte
+	Hash        [INFO_HASH_LEN]byte
 }
 
 type TorrentFile struct {
@@ -166,6 +169,12 @@ func parseMutiFile(info *TorrentInfo, fileList []any) error {
 
 func parseInfo(tf *TorrentFile, infoMap map[string]any) error {
 	info := &tf.Info
+	baseInfo := struct {
+		Length      int64  `bencode:"length"`
+		Name        string `bencode:"name"`
+		PieceLength int64  `bencode:"piece length"`
+		Pieces      string `bencode:"pieces"`
+	}{}
 
 	// name
 	if v, ok := infoMap["name"]; ok {
@@ -177,12 +186,14 @@ func parseInfo(tf *TorrentFile, infoMap map[string]any) error {
 	if len(info.Name) == 0 {
 		info.Name = uuid.New().String()
 	}
+	baseInfo.Name = info.Name
 
 	// piece_length
 	if v, ok := infoMap["piece length"]; ok {
 		value, ok := v.(int64)
 		if ok {
 			info.PieceLength = value
+			baseInfo.PieceLength = value
 		} else {
 			fmt.Println("piece length is required")
 			return ErrInvalidTorrentFile
@@ -193,6 +204,8 @@ func parseInfo(tf *TorrentFile, infoMap map[string]any) error {
 	if v, ok := infoMap["pieces"]; ok {
 		value, ok := v.(string)
 		if ok {
+			baseInfo.Pieces = value
+
 			raw := []byte(value)
 			count := len(raw) / PIECE_LEN
 			pieces := make([][PIECE_LEN]byte, count)
@@ -228,10 +241,17 @@ func parseInfo(tf *TorrentFile, infoMap map[string]any) error {
 		info.IsMutiFile = false
 	}
 
+	baseInfo.Length = info.Length
+	baseInfoBencode, err := bencode.Marshal(baseInfo)
+	if err != nil {
+		return err
+	}
+	info.Hash = sha1.Sum([]byte(baseInfoBencode))
+
 	return nil
 }
 
-func Unmarshal(r io.Reader) (*TorrentFile, error) {
+func NewTorrentFile(r io.Reader) (*TorrentFile, error) {
 	res, err := bencode.Unmarshal(r)
 	if err != nil {
 		return nil, err
