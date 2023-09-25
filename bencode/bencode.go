@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -75,9 +76,15 @@ func marshalSlice(v reflect.Value) (string, error) {
 
 func marshalMap(v reflect.Value) (string, error) {
 	ret := "d"
-	for _, key := range v.MapKeys() {
-		value := v.MapIndex(key)
-		marshaledValue, err := marshal(value)
+
+	keys := v.MapKeys()
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].String() < keys[j].String()
+	})
+
+	for _, key := range keys {
+		value := v.MapIndex(key).Interface()
+		marshaledValue, err := marshal(reflect.ValueOf(value))
 		if err != nil {
 			return "", nil
 		}
@@ -95,24 +102,42 @@ func marshalMap(v reflect.Value) (string, error) {
 }
 
 func marshalStruct(v reflect.Value) (string, error) {
-	ret := "d"
+	fields := make([]reflect.StructField, v.NumField())
 	for i := 0; i < v.NumField(); i++ {
-		fv := v.Field(i)
-		ft := v.Type().Field(i)
+		fields[i] = v.Type().Field(i)
+	}
 
-		key := ft.Tag.Get("bencode")
+	sort.Slice(fields, func(i, j int) bool {
+		tagI := fields[i].Tag.Get("bencode")
+		tagJ := fields[j].Tag.Get("bencode")
+
+		if tagI == "" {
+			tagI = strings.ToLower(fields[i].Name)
+		}
+
+		if tagJ == "" {
+			tagJ = strings.ToLower(fields[j].Name)
+		}
+
+		return tagI < tagJ
+	})
+
+	ret := "d"
+	for _, field := range fields {
+		key := field.Tag.Get("bencode")
 		if key == "" {
-			key = strings.ToLower(ft.Name)
+			key = strings.ToLower(field.Name)
 		}
-
-		marshaledValue, err := marshal(fv)
-		if err != nil {
-			return "", err
-		}
+		value := v.FieldByName(field.Name).Interface()
 
 		marshaledKey, err := marshal(reflect.ValueOf(key))
 		if err != nil {
-			return "", err
+			return "", nil
+		}
+
+		marshaledValue, err := marshal(reflect.ValueOf(value))
+		if err != nil {
+			return "", nil
 		}
 
 		ret += marshaledKey + marshaledValue
