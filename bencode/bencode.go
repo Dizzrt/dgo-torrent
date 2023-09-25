@@ -86,7 +86,7 @@ func marshalMap(v reflect.Value) (string, error) {
 		value := v.MapIndex(key).Interface()
 		marshaledValue, err := marshal(reflect.ValueOf(value))
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		marshaledKey, err := marshal(key)
@@ -132,12 +132,12 @@ func marshalStruct(v reflect.Value) (string, error) {
 
 		marshaledKey, err := marshal(reflect.ValueOf(key))
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		marshaledValue, err := marshal(reflect.ValueOf(value))
 		if err != nil {
-			return "", nil
+			return "", err
 		}
 
 		ret += marshaledKey + marshaledValue
