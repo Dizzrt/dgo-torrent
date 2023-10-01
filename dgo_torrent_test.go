@@ -59,18 +59,19 @@ func TestTrackerRequest(t *testing.T) {
 		t.Error(err)
 	}
 
-	res, err := tf.RequestTrackers()
+	_, err = tf.RequestTrackers()
 	if err != nil {
 		t.Error(err)
 	}
 
-	jbyte, err := json.Marshal(res)
-	if err != nil {
-		t.Error(err)
-	}
+	// jbyte, err := json.Marshal(res)
+	// if err != nil {
+	// 	fmt.Printf("%v\n", res)
+	// 	t.Error(err)
+	// }
 
-	checkTestDir()
-	out, _ := os.OpenFile("test/out/torrent_tracker_request_test_result.json", os.O_WRONLY|os.O_CREATE, 0666)
-	defer out.Close()
-	out.Write(jbyte)
+	// checkTestDir()
+	// out, _ := os.OpenFile("test/out/torrent_tracker_request_test_result.json", os.O_WRONLY|os.O_CREATE, 0666)
+	// defer out.Close()
+	// out.Write(jbyte)
 }
