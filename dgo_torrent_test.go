@@ -2,6 +2,7 @@ package dgotorrent_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -74,4 +75,21 @@ func TestTrackerRequest(t *testing.T) {
 	// out, _ := os.OpenFile("test/out/torrent_tracker_request_test_result.json", os.O_WRONLY|os.O_CREATE, 0666)
 	// defer out.Close()
 	// out.Write(jbyte)
+}
+
+func TestFindPeer(t *testing.T) {
+	file, _ := os.Open("./test/fs.torrent")
+	defer file.Close()
+
+	tf, err := dgotorrent.NewTorrentFile(file)
+	if err != nil {
+		t.Error(err)
+	}
+
+	peers, err := tf.FindPeers()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("%+v\n", peers)
 }

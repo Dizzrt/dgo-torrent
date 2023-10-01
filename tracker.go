@@ -23,7 +23,7 @@ type TrackerResp struct {
 	Incomplete  int64  `incomplete:"incomplete"`
 	Interval    int64  `incomplete:"interval"`
 	MinInterval int64  `incomplete:"min interval"`
-	Peers       string `incomplete:"peers"`
+	Peers       []byte `incomplete:"peers"`
 }
 
 func parseTrackerResp(resp map[string]any) (TrackerResp, error) {
@@ -77,10 +77,10 @@ func parseTrackerResp(resp map[string]any) (TrackerResp, error) {
 	if v, ok := resp["peers"]; ok {
 		value, ok := v.(string)
 		if ok {
-			ret.Peers = value
+			ret.Peers = []byte(value)
 		}
 	} else {
-		ret.Peers = ""
+		ret.Peers = nil
 	}
 
 	return ret, nil
@@ -188,8 +188,6 @@ func (tf *TorrentFile) RequestTrackers() ([]TrackerResp, error) {
 
 		respList = append(respList, httpRespList...)
 	}
-
-	fmt.Printf("[XXXXX]: %+v\n", respList)
 
 	// if len(udpTrackers) > 0 {
 	// 	udpRespList, err := requestUdpTrackers(udpTrackers)
