@@ -1,7 +1,6 @@
 package dgotorrent
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"net/http"
@@ -92,8 +91,9 @@ func (tf *TorrentFile) buildHttpTrackerUrl(tracker string) (string, error) {
 		return "", err
 	}
 
-	var peerId [20]byte
-	_, _ = rand.Read(peerId[:])
+	// var peerId [20]byte
+	// _, _ = rand.Read(peerId[:])
+	peerId := [20]byte{38, 199, 66, 129, 77, 230, 210, 70, 189, 242, 175, 2, 142, 133, 27, 170, 161, 8, 26, 8}
 	params := url.Values{
 		"info_hash":  []string{string(tf.Info.Hash[:])},
 		"peer_id":    []string{string(peerId[:])},
