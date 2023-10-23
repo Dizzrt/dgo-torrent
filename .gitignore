@@ -23,6 +23,9 @@ go.work
 # Apple Desktop services store
 .DS_Store
 
+#config 
+.dgo_torrent.toml
+
 # Test
 test/out
 test/fs.torrent
