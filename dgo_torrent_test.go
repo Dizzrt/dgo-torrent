@@ -123,8 +123,10 @@ func TestPeerConn(t *testing.T) {
 	broadcast := net.ParseIP("255.255.255.255")
 
 	checkTestDir()
-	out, _ := os.OpenFile("test/out/torrent_peer_conn_test_result.json", os.O_WRONLY|os.O_CREATE, 0666)
+	out, _ := os.OpenFile("test/out/torrent_peer_conn_test_result.log", os.O_WRONLY|os.O_CREATE, 0666)
 	defer out.Close()
+
+	out.Write([]byte(fmt.Sprintf("peers: %+v\npeer count: %d\n", peers, len(peers))))
 
 	for _, pp := range peers {
 		if pp.IP.Equal(broadcast) {
@@ -138,6 +140,7 @@ func TestPeerConn(t *testing.T) {
 			pc, err := dgotorrent.NewConn(p, tf.Info.Hash, pid)
 			if err != nil {
 				// t.Error(err)
+				out.Write([]byte("error: "))
 				out.Write([]byte(err.Error()))
 				out.Write([]byte("\n"))
 			} else {

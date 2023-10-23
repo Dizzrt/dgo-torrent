@@ -1,11 +1,11 @@
 package dgotorrent
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"strconv"
 	"time"
 )
@@ -90,8 +90,42 @@ func (tf *TorrentFile) FindPeers() ([]Peer, error) {
 	return peers, nil
 }
 
+func checkHandshakeMsg(r io.Reader, targetInfoHash [INFO_HASH_LEN]byte) error {
+	lenBuf := make([]byte, 1)
+	_, err := io.ReadFull(r, lenBuf)
+	if err != nil {
+		return err
+	}
+
+	preLen := int(lenBuf[0])
+	if preLen == 0 {
+		err := fmt.Errorf("prelen can not be 0")
+		return err
+	}
+
+	msgBuf := make([]byte, 48+preLen)
+	_, err = io.ReadFull(r, msgBuf)
+	if err != nil {
+		return err
+	}
+
+	// var peerID [PEER_ID_LEN]byte
+	var infoHash [INFO_HASH_LEN]byte
+
+	copy(infoHash[:], msgBuf[preLen+8:preLen+8+INFO_HASH_LEN])
+	// copy(peerID[:], msgBuf[preLen+8+INFO_HASH_LEN:])
+
+	// preStr := string(msgBuf[0:preLen])
+
+	if !bytes.Equal(infoHash[:], targetInfoHash[:]) {
+		return fmt.Errorf("handshake msg error: " + string(infoHash[:]))
+	}
+
+	return nil
+}
+
 func handshake(conn net.Conn, infoHash [INFO_HASH_LEN]byte, peerID [PEER_ID_LEN]byte) error {
-	conn.SetDeadline(time.Now().Add(15 * time.Second))
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
 	defer conn.SetDeadline(time.Time{})
 
 	msg := struct {
@@ -138,7 +172,7 @@ func (c *PeerConn) ReadMsg() (*PeerMsg, error) {
 }
 
 func fillBitfield(c *PeerConn) error {
-	c.SetDeadline(time.Now().Add(15 * time.Second))
+	c.SetDeadline(time.Now().Add(5 * time.Second))
 	defer c.SetDeadline(time.Time{})
 
 	msg, err := c.ReadMsg()
@@ -159,11 +193,8 @@ func fillBitfield(c *PeerConn) error {
 }
 
 func NewConn(peer Peer, infoHash [INFO_HASH_LEN]byte, peerID [PEER_ID_LEN]byte) (*PeerConn, error) {
-	out, _ := os.OpenFile("test/out/torrent_peer_conn_test_result.json", os.O_WRONLY|os.O_CREATE, 0666)
-	defer out.Close()
-
 	addr := net.JoinHostPort(peer.IP.String(), strconv.Itoa(int(peer.Port)))
-	conn, err := net.DialTimeout("tcp", addr, 15*time.Second)
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +202,12 @@ func NewConn(peer Peer, infoHash [INFO_HASH_LEN]byte, peerID [PEER_ID_LEN]byte) 
 	err = handshake(conn, infoHash, peerID)
 	if err != nil {
 		conn.Close()
-		out.Write([]byte(fmt.Sprintf("handshake faild with IP: %v\n", peer.IP)))
+		return nil, err
+	}
+
+	err = checkHandshakeMsg(conn, infoHash)
+	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 
@@ -185,7 +221,6 @@ func NewConn(peer Peer, infoHash [INFO_HASH_LEN]byte, peerID [PEER_ID_LEN]byte) 
 
 	err = fillBitfield(c)
 	if err != nil {
-		out.Write([]byte(fmt.Sprintf("fill bitfield faild with IP: %v\n", peer.IP)))
 		return nil, err
 	}
 
