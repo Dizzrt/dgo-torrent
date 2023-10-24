@@ -99,8 +99,6 @@ func TestFindPeer(t *testing.T) {
 }
 
 func TestPeerConn(t *testing.T) {
-	pid := [20]byte{38, 199, 66, 129, 77, 230, 210, 70, 189, 242, 175, 2, 142, 133, 27, 170, 161, 8, 26, 8}
-
 	file, _ := os.Open("./test/fs.torrent")
 	defer file.Close()
 
@@ -137,7 +135,7 @@ func TestPeerConn(t *testing.T) {
 		go func(p dgotorrent.Peer) {
 			defer wg.Done()
 
-			pc, err := dgotorrent.NewConn(p, tf.Info.Hash, pid)
+			pc, err := dgotorrent.NewConn(p, tf.Info.Hash, dgotorrent.Config().GetPeerID())
 			if err != nil {
 				// t.Error(err)
 				out.Write([]byte("error: "))
@@ -145,7 +143,7 @@ func TestPeerConn(t *testing.T) {
 				out.Write([]byte("\n"))
 			} else {
 				defer pc.Close()
-				out.Write([]byte(fmt.Sprintf("bitfield: %+v\n", pc.Fieled)))
+				out.Write([]byte(fmt.Sprintf("bitfield: %+v\n", pc.PiecesMap)))
 			}
 		}(pp)
 	}

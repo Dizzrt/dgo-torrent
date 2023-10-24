@@ -71,17 +71,24 @@ func (cf *DConfig) GetConfig() *viper.Viper {
 }
 
 func (cf *DConfig) GetPeerID() string {
-	// if !config.IsSet(KEY_PEER_ID) {
-	// 	config.Set(KEY_PEER_ID, generatePeerID())
-	// 	config.WriteConfig()
-	// }
+	if !config.IsSet(KEY_PEER_ID) {
+		id := generatePeerID()
 
-	// id := config.GetString(KEY_PEER_ID)
+		config.Set(KEY_PEER_ID, id)
+		config.WriteConfig()
 
-	// idBytes:= []byte(id)
-	// if _,ok:= idBytes.([PEER_ID_LEN]byte); !ok {
+		return id
+	}
 
-	// }
+	id := config.GetString(KEY_PEER_ID)
+	idBytes := []byte(id)
+	if len(idBytes) != 20 {
+		// malformed peer id, regenerate
+		id = generatePeerID()
 
-	return config.GetString(KEY_PEER_ID)
+		config.Set(KEY_PEER_ID, id)
+		config.WriteConfig()
+	}
+
+	return id
 }

@@ -38,6 +38,7 @@ const (
 	PEER_MSG_TYPE_PIECE
 	PEER_MSG_TYPE_CANCEL
 	PEER_MSG_TYPE_KEEP_ALIVE
+	PEER_MSG_INVALID
 )
 
 type Peer struct {
@@ -52,11 +53,11 @@ type PeerMsg struct {
 
 type PeerConn struct {
 	net.Conn
-	Choked   bool
-	Fieled   Bitfield
-	peer     Peer
-	peerID   [PEER_ID_LEN]byte
-	infoHash [INFO_HASH_LEN]byte
+	Choked    bool
+	PiecesMap Bitfield
+	peer      Peer
+	peerID    string
+	infoHash  [INFO_HASH_LEN]byte
 }
 
 func (tf *TorrentFile) FindPeers() ([]Peer, error) {
@@ -88,6 +89,109 @@ func (tf *TorrentFile) FindPeers() ([]Peer, error) {
 	}
 
 	return peers, nil
+}
+
+func (c *PeerConn) ReadMsg() (*PeerMsg, error) {
+	lenBuf := make([]byte, 4)
+	_, err := io.ReadFull(c, lenBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	length := binary.BigEndian.Uint32(lenBuf)
+	if length == 0 {
+		return nil, nil
+	}
+
+	msgBuf := make([]byte, length)
+	_, err = io.ReadFull(c, msgBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PeerMsg{
+		Type:    PeerMsgTyep(msgBuf[0]),
+		Payload: msgBuf[1:],
+	}, nil
+}
+
+func (c *PeerConn) WriteMsg(msg *PeerMsg) (int, error) {
+	if msg == nil {
+		return 0, nil
+	}
+
+	if msg.Type >= PEER_MSG_INVALID {
+		return 0, fmt.Errorf("peer msg type out of range")
+	}
+
+	PayloadLength := uint32(len(msg.Payload) + 1)
+	buf := make([]byte, 4+PayloadLength)
+
+	binary.BigEndian.PutUint32(buf[0:4], PayloadLength)
+	buf[4] = byte(msg.Type)
+
+	copy(buf[4+1:], msg.Payload)
+	return c.Write(buf)
+}
+
+// region new peer conn
+
+func NewConn(peer Peer, infoHash [INFO_HASH_LEN]byte, peerID string) (*PeerConn, error) {
+	addr := net.JoinHostPort(peer.IP.String(), strconv.Itoa(int(peer.Port)))
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	err = handshake(conn, infoHash, peerID)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	err = checkHandshakeMsg(conn, infoHash)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	c := &PeerConn{
+		Conn:     conn,
+		Choked:   true,
+		peer:     peer,
+		peerID:   peerID,
+		infoHash: infoHash,
+	}
+
+	err = fillBitfield(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
+
+func handshake(conn net.Conn, infoHash [INFO_HASH_LEN]byte, peerID string) error {
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
+	defer conn.SetDeadline(time.Time{})
+
+	msg := struct {
+		PreStr   string
+		InfoHash [INFO_HASH_LEN]byte
+		PeerID   string
+	}{"BitTorrent protocol", infoHash, peerID}
+
+	buf := make([]byte, len(msg.PreStr)+49)
+	buf[0] = byte(len(msg.PreStr))
+
+	cur := 1
+	cur += copy(buf[cur:], []byte(msg.PreStr))
+	cur += copy(buf[cur:], make([]byte, 8))
+	cur += copy(buf[cur:], msg.InfoHash[:])
+	cur += copy(buf[cur:], msg.PeerID[:])
+	_, err := conn.Write(buf)
+
+	return err
 }
 
 func checkHandshakeMsg(r io.Reader, targetInfoHash [INFO_HASH_LEN]byte) error {
@@ -124,53 +228,6 @@ func checkHandshakeMsg(r io.Reader, targetInfoHash [INFO_HASH_LEN]byte) error {
 	return nil
 }
 
-func handshake(conn net.Conn, infoHash [INFO_HASH_LEN]byte, peerID [PEER_ID_LEN]byte) error {
-	conn.SetDeadline(time.Now().Add(3 * time.Second))
-	defer conn.SetDeadline(time.Time{})
-
-	msg := struct {
-		PreStr   string
-		InfoHash [INFO_HASH_LEN]byte
-		PeerID   [PEER_ID_LEN]byte
-	}{"BitTorrent protocol", infoHash, peerID}
-
-	buf := make([]byte, len(msg.PreStr)+49)
-	buf[0] = byte(len(msg.PreStr))
-
-	cur := 1
-	cur += copy(buf[cur:], []byte(msg.PreStr))
-	cur += copy(buf[cur:], make([]byte, 8))
-	cur += copy(buf[cur:], msg.InfoHash[:])
-	cur += copy(buf[cur:], msg.PeerID[:])
-	_, err := conn.Write(buf)
-
-	return err
-}
-
-func (c *PeerConn) ReadMsg() (*PeerMsg, error) {
-	lenBuf := make([]byte, 4)
-	_, err := io.ReadFull(c, lenBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	length := binary.BigEndian.Uint32(lenBuf)
-	if length == 0 {
-		return nil, nil
-	}
-
-	msgBuf := make([]byte, length)
-	_, err = io.ReadFull(c, msgBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PeerMsg{
-		Type:    PeerMsgTyep(msgBuf[0]),
-		Payload: msgBuf[1:],
-	}, nil
-}
-
 func fillBitfield(c *PeerConn) error {
 	c.SetDeadline(time.Now().Add(5 * time.Second))
 	defer c.SetDeadline(time.Time{})
@@ -188,41 +245,8 @@ func fillBitfield(c *PeerConn) error {
 		return fmt.Errorf("type error")
 	}
 
-	c.Fieled = msg.Payload
+	c.PiecesMap = msg.Payload
 	return nil
 }
 
-func NewConn(peer Peer, infoHash [INFO_HASH_LEN]byte, peerID [PEER_ID_LEN]byte) (*PeerConn, error) {
-	addr := net.JoinHostPort(peer.IP.String(), strconv.Itoa(int(peer.Port)))
-	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	err = handshake(conn, infoHash, peerID)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	err = checkHandshakeMsg(conn, infoHash)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	c := &PeerConn{
-		Conn:     conn,
-		Choked:   true,
-		peer:     peer,
-		peerID:   peerID,
-		infoHash: infoHash,
-	}
-
-	err = fillBitfield(c)
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
+// endregion
