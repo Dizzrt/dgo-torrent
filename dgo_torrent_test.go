@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	dgotorrent "github.com/Dizzrt/dgo-torrent"
+	"github.com/Dizzrt/dgo-torrent/dlog"
 )
 
 func checkTestDir() {
@@ -99,7 +100,7 @@ func TestFindPeer(t *testing.T) {
 }
 
 func TestPeerConn(t *testing.T) {
-	file, _ := os.Open("./test/fs.torrent")
+	file, _ := os.Open("./test/debian.torrent")
 	defer file.Close()
 
 	tf, err := dgotorrent.NewTorrentFile(file)
@@ -112,20 +113,13 @@ func TestPeerConn(t *testing.T) {
 		t.Error(err)
 	}
 
-	// fmt.Printf("peers: %+v\npeer count: %d\n", peers, len(peers))
-
 	var peerId [20]byte
 	_, _ = rand.Read(peerId[:])
 
 	var wg sync.WaitGroup
 	broadcast := net.ParseIP("255.255.255.255")
 
-	checkTestDir()
-	out, _ := os.OpenFile("test/out/torrent_peer_conn_test_result.log", os.O_WRONLY|os.O_CREATE, 0666)
-	defer out.Close()
-
-	out.Write([]byte(fmt.Sprintf("peers: %+v\npeer count: %d\n", peers, len(peers))))
-
+	dlog.Infof("peers: %+v\npeer count:%d", peers, len(peers))
 	for _, pp := range peers {
 		if pp.IP.Equal(broadcast) {
 			continue
@@ -138,15 +132,14 @@ func TestPeerConn(t *testing.T) {
 			pc, err := dgotorrent.NewConn(p, tf.Info.Hash, dgotorrent.Config().GetPeerID())
 			if err != nil {
 				// t.Error(err)
-				out.Write([]byte("error: "))
-				out.Write([]byte(err.Error()))
-				out.Write([]byte("\n"))
+				dlog.Errorf("error: %v", err)
 			} else {
 				defer pc.Close()
-				out.Write([]byte(fmt.Sprintf("bitfield: %+v\n", pc.PiecesMap)))
+				dlog.Infof("bitfield: %+v", pc.PiecesMap)
 			}
 		}(pp)
 	}
 
 	wg.Wait()
+	dlog.L().Sync()
 }
