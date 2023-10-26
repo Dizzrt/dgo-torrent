@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/Dizzrt/dgo-torrent/dlog"
 	"github.com/spf13/viper"
 )
 
@@ -23,6 +24,9 @@ const (
 )
 
 func init() {
+	// init logger
+	dlog.Init()
+
 	// check config file
 	_, err := os.Stat(_CONFIG_PATH)
 	if err != nil {

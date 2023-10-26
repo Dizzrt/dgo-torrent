@@ -26,6 +26,9 @@ go.work
 #config 
 .dgo_torrent.toml
 
+#log
+*/log
+
 # Test
 test/out
 test/fs.torrent
