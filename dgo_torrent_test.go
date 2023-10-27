@@ -47,6 +47,7 @@ func TestTorrentFile(t *testing.T) {
 		t.Error(err)
 	}
 
+	dlog.L().Sync()
 	// if err := unmarshaTorrentFile("test/mutiFile.torrent", "muti"); err != nil {
 	// 	t.Error(err)
 	// }

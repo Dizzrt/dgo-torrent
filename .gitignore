@@ -27,7 +27,10 @@ go.work
 .dgo_torrent.toml
 
 #log
-*/log
+**/log
+
+#sqlite
+**/.data
 
 # Test
 test/out

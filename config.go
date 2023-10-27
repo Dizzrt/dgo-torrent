@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/Dizzrt/dgo-torrent/db"
 	"github.com/Dizzrt/dgo-torrent/dlog"
 	"github.com/spf13/viper"
 )
@@ -48,6 +49,9 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("[dgo_torrent] viper read config failed with error: %v", err))
 	}
+
+	// init sqlite
+	db.Init()
 }
 
 func generatePeerID() string {
