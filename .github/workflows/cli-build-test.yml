@@ -1,0 +1,30 @@
+name: CLI Build Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21.3"
+          cache: false
+
+      - name: Verify go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code
+
+      - name: Build CLI
+        run: cd bin && go build -v -o ../build/cli .
+
+      - name: Test CLI
+        run: ./build/cli version
