@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	path = "./.data"
+	path = ".data"
 
 	_CREATE_TABLE_WORKS = `
 		CREATE TABLE works (
@@ -39,10 +39,12 @@ func isTableExists(tableName string) bool {
 func initTables() {
 	// works
 	if !isTableExists("works") {
-		_, err := db.Exec(_CREATE_TABLE_WORKS)
-		if err != nil {
-			dlog.Fatal(err)
-		}
+		// _, err := db.Exec(_CREATE_TABLE_WORKS)
+		// if err != nil {
+		// 	dlog.Fatal(err)
+		// }
+		// TODO init db
+		fmt.Println("TODO init db")
 	}
 }
 
@@ -58,7 +60,7 @@ func DB() *sql.DB {
 			dlog.Fatal(err)
 		}
 
-		err = db.Ping()
+		err = _db.Ping()
 		if err != nil {
 			dlog.Fatal(err)
 		}

@@ -13,6 +13,34 @@ import (
 	"github.com/Dizzrt/dgo-torrent/dlog"
 )
 
+func TestDownload(t *testing.T) {
+	file, _ := os.Open("test/debian.torrent")
+	defer file.Close()
+
+	tf, err := dgotorrent.NewTorrentFile(file)
+	if err != nil {
+		t.Error(err)
+	}
+
+	peers, err := tf.FindPeers()
+	if err != nil {
+		t.Error(err)
+	}
+
+	task := dgotorrent.TorrentTask{
+		PeerID:      dgotorrent.Config().GetPeerID(),
+		Peers:       peers,
+		InfoHash:    tf.Info.Hash,
+		FileName:    "/Users/dizzrt/Downloads/debian.iso",
+		FileLength:  int(tf.Info.Length),
+		PieceLength: int(tf.Info.PieceLength),
+		PiecesHash:  tf.Info.Pieces,
+	}
+
+	dgotorrent.Download(&task)
+	dlog.L().Sync()
+}
+
 func checkTestDir() {
 	if _, err := os.Stat("./test/out"); os.IsNotExist(err) {
 		os.Mkdir("./test/out", os.ModePerm)

@@ -23,9 +23,7 @@ var (
 )
 
 func Init() {
-	fmt.Println("here")
 	once.Do(func() {
-		fmt.Println("here do")
 		hook := &lumberjack.Logger{
 			Filename:   fmt.Sprintf("%s/%s", logdir, logFile),
 			MaxSize:    10,
