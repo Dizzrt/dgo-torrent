@@ -3,7 +3,6 @@ package dgotorrent
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
@@ -118,28 +117,32 @@ func (tf *TorrentFile) requestHttpTrackers(httpTrackers []string) ([]TrackerResp
 		wg.Add(1)
 		go func(tracker string) {
 			defer wg.Done()
+
 			client := &http.Client{Timeout: 15 * time.Second}
 			url, err := tf.buildHttpTrackerUrl(tracker)
 			if err != nil {
+				dlog.Errorf("Failed to build http tracker url with error: %v", err)
 				return
 			}
 
 			clientResp, err := client.Get(url)
 			if err != nil {
+				dlog.Errorf("Failed to request http tracker with error: %v", err)
 				return
 			}
 			defer clientResp.Body.Close()
 
 			res, err := bencode.Unmarshal(clientResp.Body)
 			if err != nil {
-				fmt.Println(err)
+				dlog.Errorf("Failed to unmarshal http tracker res with error: %v", err)
+				return
 			}
 
 			if v, ok := res.(map[string]any); ok {
 				resp, err := parseTrackerResp(v)
 				if err != nil {
-					fmt.Println(err)
-					// XXX do something
+					dlog.Errorf("Failed to parse http tracker resp with error: %v", err)
+					return
 				}
 
 				respList = append(respList, resp)
@@ -149,6 +152,68 @@ func (tf *TorrentFile) requestHttpTrackers(httpTrackers []string) ([]TrackerResp
 
 	wg.Wait()
 	return respList, nil
+}
+
+func resolveUDPTracker(tracker string) (*net.UDPAddr, error) {
+	parsedUrl, err := url.Parse(tracker)
+	if err != nil {
+		dlog.Errorf("Failed to parse UDP url, error: %v", err)
+		return nil, err
+	}
+
+	tracker = parsedUrl.Host
+	addr, err := net.ResolveUDPAddr("udp", tracker)
+	if err != nil {
+		dlog.Errorf("Failed to resolve UDP addr, error: %v", err)
+		return nil, err
+	}
+
+	return addr, nil
+}
+
+func connectUDPTracker(conn *net.UDPConn, transactionID uint32) (uint64, error) {
+	data := make([]byte, 16)
+	binary.BigEndian.PutUint64(data[0:8], 0x41727101980) // protocol_id - magic number
+	binary.BigEndian.PutUint32(data[8:12], 0)            // action 0: connect
+	binary.BigEndian.PutUint32(data[12:16], transactionID)
+
+	_, err := conn.Write(data)
+	if err != nil {
+		dlog.Errorf("Failed to connect udp server with error: %v", err)
+		return 0, err
+	}
+
+	conn.SetDeadline(time.Now().Add(15 * time.Second))
+	buf := make([]byte, 16)
+	_, err = conn.Read(buf)
+	if err != nil {
+		dlog.Errorf("Faile to read udp message, error: %v", err)
+		return 0, err
+	}
+
+	// action := binary.BigEndian.Uint32(buf[0:4])
+	// transaction_id := binary.BigEndian.Uint32(buf[4:8])
+	connectionID := binary.BigEndian.Uint64(buf[8:16])
+	return connectionID, nil
+}
+
+func (tf *TorrentFile) buildUDPTrackerPackage(connectionID uint64, transactionID uint32) []byte {
+	data := make([]byte, 98)
+	binary.BigEndian.PutUint64(data[0:8], connectionID)
+	binary.BigEndian.PutUint32(data[8:12], 1)
+	binary.BigEndian.PutUint32(data[12:16], transactionID)
+	copy(data[16:36], tf.Info.Hash[:])
+	copy(data[36:56], Config().GetPeerID())
+	binary.BigEndian.PutUint64(data[56:64], 0)
+	binary.BigEndian.PutUint64(data[64:72], uint64(tf.Info.Length))
+	binary.BigEndian.PutUint64(data[72:80], 0)
+	binary.BigEndian.PutUint32(data[80:84], 2)
+	binary.BigEndian.PutUint32(data[84:88], 0)
+	binary.BigEndian.PutUint32(data[88:92], 0)
+	binary.BigEndian.PutUint32(data[92:96], 0xffffffff)
+	binary.BigEndian.PutUint16(data[96:98], 6666)
+
+	return data
 }
 
 func (tf *TorrentFile) requestUdpTrackers(udpTrackers []string) ([]TrackerResp, error) {
@@ -161,16 +226,8 @@ func (tf *TorrentFile) requestUdpTrackers(udpTrackers []string) ([]TrackerResp, 
 		go func(tracker string) {
 			defer wg.Done()
 
-			parsedUrl, err := url.Parse(tracker)
+			addr, err := resolveUDPTracker(tracker)
 			if err != nil {
-				dlog.Errorf("Failed to parse UDP url, error: %v", err)
-				return
-			}
-
-			tracker = parsedUrl.Host
-			addr, err := net.ResolveUDPAddr("udp", tracker)
-			if err != nil {
-				dlog.Errorf("Failed to resolve UDP addr, error: %v", err)
 				return
 			}
 
@@ -181,44 +238,12 @@ func (tf *TorrentFile) requestUdpTrackers(udpTrackers []string) ([]TrackerResp, 
 			}
 			defer conn.Close()
 
-			data := make([]byte, 16)
-			binary.BigEndian.PutUint64(data[0:8], 0x41727101980)
-			binary.BigEndian.PutUint32(data[8:12], 0)
-			binary.BigEndian.PutUint32(data[12:16], uint32(r.Uint32()))
-
-			_, err = conn.Write(data)
+			cid, err := connectUDPTracker(conn, r.Uint32())
 			if err != nil {
-				dlog.Errorf("Failed to connect udp server: %v with error: %v", addr, err)
 				return
 			}
 
-			conn.SetDeadline(time.Now().Add(15 * time.Second))
-			buf := make([]byte, 16)
-			_, err = conn.Read(buf)
-			if err != nil {
-				dlog.Errorf("Faile to read udp message, error: %v", err)
-				return
-			}
-
-			// action := binary.BigEndian.Uint32(buf[0:4])
-			// rtid := binary.BigEndian.Uint32(buf[4:8])
-			cid := binary.BigEndian.Uint64(buf[8:16])
-
-			data = make([]byte, 98)
-			binary.BigEndian.PutUint64(data[0:8], cid)
-			binary.BigEndian.PutUint32(data[8:12], 1)
-			binary.BigEndian.PutUint32(data[12:16], r.Uint32())
-			copy(data[16:36], tf.Info.Hash[:])
-			copy(data[36:56], Config().GetPeerID())
-			binary.BigEndian.PutUint64(data[56:64], 0)
-			binary.BigEndian.PutUint64(data[64:72], uint64(tf.Info.Length))
-			binary.BigEndian.PutUint64(data[72:80], 0)
-			binary.BigEndian.PutUint32(data[80:84], 2)
-			binary.BigEndian.PutUint32(data[84:88], 0)
-			binary.BigEndian.PutUint32(data[88:92], 0)
-			binary.BigEndian.PutUint32(data[92:96], 0xffffffff)
-			binary.BigEndian.PutUint16(data[96:98], 6666)
-
+			data := tf.buildUDPTrackerPackage(cid, r.Uint32())
 			_, err = conn.Write(data)
 			if err != nil {
 				dlog.Errorf("Failed to request peers, error: %v", err)
@@ -226,7 +251,7 @@ func (tf *TorrentFile) requestUdpTrackers(udpTrackers []string) ([]TrackerResp, 
 			}
 			conn.SetDeadline(time.Now().Add(15 * time.Second))
 
-			buf = make([]byte, 3092)
+			buf := make([]byte, 3092)
 			oob := make([]byte, 1024)
 			n, _, flags, _, err := conn.ReadMsgUDP(buf, oob)
 			if err != nil {
@@ -238,8 +263,7 @@ func (tf *TorrentFile) requestUdpTrackers(udpTrackers []string) ([]TrackerResp, 
 				dlog.Warn("Truncated peers")
 			}
 
-			x := n - 20
-			x = (x / 6) * 6
+			x := (n - 20) / 6 * 6
 			if x <= 0 {
 				return
 			}

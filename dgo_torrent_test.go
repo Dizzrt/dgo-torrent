@@ -71,7 +71,7 @@ func unmarshaTorrentFile(filePath string, t string) error {
 }
 
 func TestTorrentFile(t *testing.T) {
-	if err := unmarshaTorrentFile("test/fs.torrent", "fs"); err != nil {
+	if err := unmarshaTorrentFile("test/debian.torrent", "debian"); err != nil {
 		t.Error(err)
 	}
 
@@ -85,7 +85,7 @@ func TestTrackerRequest(t *testing.T) {
 	// announceList := []string{}
 	// tf := &dgotorrent.TorrentFile{AnnounceList: announceList}
 
-	file, _ := os.Open("./test/fs.torrent")
+	file, _ := os.Open("./test/debian.torrent")
 	defer file.Close()
 
 	tf, err := dgotorrent.NewTorrentFile(file)
