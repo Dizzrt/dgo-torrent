@@ -44,7 +44,6 @@ func initTables() {
 		// 	dlog.Fatal(err)
 		// }
 		// TODO init db
-		fmt.Println("TODO init db")
 	}
 }
 

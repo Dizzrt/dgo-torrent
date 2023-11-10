@@ -1,7 +1,6 @@
 package dgotorrent_test
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -129,7 +128,7 @@ func TestFindPeer(t *testing.T) {
 }
 
 func TestPeerConn(t *testing.T) {
-	file, _ := os.Open("./test/debian.torrent")
+	file, _ := os.Open("./test/fs.torrent")
 	defer file.Close()
 
 	tf, err := dgotorrent.NewTorrentFile(file)
@@ -142,15 +141,13 @@ func TestPeerConn(t *testing.T) {
 		t.Error(err)
 	}
 
-	var peerId [20]byte
-	_, _ = rand.Read(peerId[:])
-
 	var wg sync.WaitGroup
 	broadcast := net.ParseIP("255.255.255.255")
+	self := net.ParseIP("0.0.0.0")
 
 	dlog.Infof("peers: %+v\npeer count:%d", peers, len(peers))
 	for _, pp := range peers {
-		if pp.IP.Equal(broadcast) {
+		if pp.IP.Equal(broadcast) || pp.IP.Equal(self) {
 			continue
 		}
 
