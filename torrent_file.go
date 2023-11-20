@@ -10,14 +10,29 @@ import (
 	"github.com/google/uuid"
 )
 
-const PIECE_LEN = 20
-const INFO_HASH_LEN = 20
-
 var (
 	ErrInvalidTorrentFile = errors.New("invalid torrent file")
 )
 
+const PIECE_LEN = 20
+const INFO_HASH_LEN = 20
+
+type TMF_TYPE uint8
+
+const (
+	TMF_TYPE_DIRECTORY = iota
+	TMF_TYPE_FILE
+)
+
 type TorrentMutiFile struct {
+	Type      TMF_TYPE
+	Name      string
+	Length    int64
+	Subs      map[string]TorrentMutiFile
+	SubsOrder []string
+}
+
+type iMutiFile struct {
 	Path   []string
 	Length int64
 }
@@ -26,7 +41,7 @@ type TorrentInfo struct {
 	Name        string
 	IsMutiFile  bool
 	Length      int64
-	MutiFiles   []TorrentMutiFile
+	MutiFiles   TorrentMutiFile
 	PieceLength int64
 	Pieces      [][PIECE_LEN]byte
 	Hash        [INFO_HASH_LEN]byte
@@ -118,9 +133,9 @@ func parseBase(tf *TorrentFile, tfMap map[string]any) error {
 	return nil
 }
 
-func parseMutiFile(info *TorrentInfo, fileList []any) error {
+func buildIMutiFile(info *TorrentInfo, fileList []any) ([]iMutiFile, error) {
 	filesCount := len(fileList)
-	list := make([]TorrentMutiFile, 0, filesCount)
+	ret := make([]iMutiFile, 0, filesCount)
 
 	for _, _file := range fileList {
 		file, ok := _file.(map[string]any)
@@ -128,16 +143,16 @@ func parseMutiFile(info *TorrentInfo, fileList []any) error {
 			continue
 		}
 
-		tmf := TorrentMutiFile{}
+		imf := iMutiFile{}
 		if v, ok := file["length"]; ok {
 			value, ok := v.(int64)
 			if ok {
-				tmf.Length = value
+				imf.Length = value
 			} else {
-				return ErrInvalidTorrentFile
+				return nil, ErrInvalidTorrentFile
 			}
 		} else {
-			return ErrInvalidTorrentFile
+			return nil, ErrInvalidTorrentFile
 		}
 
 		if v, ok := file["path"]; ok {
@@ -149,21 +164,74 @@ func parseMutiFile(info *TorrentInfo, fileList []any) error {
 						path = append(path, p)
 					}
 				}
-
-				tmf.Path = path
+				imf.Path = path
 			} else {
-				return ErrInvalidTorrentFile
+				return nil, ErrInvalidTorrentFile
 			}
 		} else {
-			return ErrInvalidTorrentFile
+			return nil, ErrInvalidTorrentFile
 		}
 
-		list = append(list, tmf)
+		ret = append(ret, imf)
 	}
 
-	info.MutiFiles = list
-	info.IsMutiFile = true
+	return ret, nil
+}
 
+func buildTorrentMutiFile(upper TorrentMutiFile, path []string, length int64) TorrentMutiFile {
+	if len(path) == 1 {
+		upper.Subs[path[0]] = TorrentMutiFile{
+			Type:      TMF_TYPE_FILE,
+			Name:      path[0],
+			Length:    length,
+			Subs:      nil,
+			SubsOrder: nil,
+		}
+
+		upper.SubsOrder = append(upper.SubsOrder, path[0])
+		return upper
+	}
+
+	var tmf TorrentMutiFile
+	if temp, ok := upper.Subs[path[0]]; ok {
+		tmf = temp
+	} else {
+		tmf = TorrentMutiFile{
+			Type:      TMF_TYPE_DIRECTORY,
+			Name:      path[0],
+			Length:    0,
+			Subs:      make(map[string]TorrentMutiFile),
+			SubsOrder: make([]string, 0),
+		}
+
+		upper.SubsOrder = append(upper.SubsOrder, path[0])
+	}
+
+	tmf = buildTorrentMutiFile(tmf, path[1:], length)
+	upper.Subs[path[0]] = tmf
+
+	return upper
+}
+
+func parseMutiFile(info *TorrentInfo, fileList []any) error {
+	imfs, err := buildIMutiFile(info, fileList)
+	if err != nil {
+		return err
+	}
+
+	tmf := TorrentMutiFile{
+		Type:      TMF_TYPE_DIRECTORY,
+		Name:      info.Name,
+		Length:    info.Length,
+		Subs:      make(map[string]TorrentMutiFile),
+		SubsOrder: make([]string, 0),
+	}
+
+	for _, v := range imfs {
+		tmf = buildTorrentMutiFile(tmf, v.Path, v.Length)
+	}
+
+	info.MutiFiles = tmf
 	return nil
 }
 
@@ -218,6 +286,8 @@ func parseInfo(tf *TorrentFile, infoMap map[string]any) error {
 		} else {
 			return ErrInvalidTorrentFile
 		}
+
+		info.IsMutiFile = true
 	} else {
 		// single file
 		if v, ok = infoMap["length"]; ok {
