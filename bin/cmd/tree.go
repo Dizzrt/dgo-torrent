@@ -1,28 +1,14 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	dgotorrent "github.com/Dizzrt/dgo-torrent"
+	"github.com/Dizzrt/dgo-torrent/dlog"
 	"github.com/spf13/cobra"
 )
-
-type MutiFileType uint8
-
-const (
-	MFT_DIRECTORY = iota
-	MFT_FILE
-)
-
-type MutiFile struct {
-	Type      MutiFileType
-	Name      string
-	Size      int
-	Subs      map[string]MutiFile
-	SubsOrder []string
-}
 
 // treeCmd represents the tree command
 var treeCmd = &cobra.Command{
@@ -57,81 +43,66 @@ var treeCmd = &cobra.Command{
 			return err
 		}
 
-		if !tf.Info.IsMutiFile {
-			fmt.Println(tf.Info.Name)
+		if tf.Info.IsMutiFile {
+			printTree(tf.Info.MutiFiles, make([]string, 0), 0)
 		} else {
-			// jb, _ := json.Marshal(tf.Info.MutiFiles)
-			// fmt.Println(string(jb))
-			p(tf.Info.MutiFiles)
+			fmt.Printf("%s [%s]\n", tf.Info.Name, formatSize(tf.Info.Length))
 		}
 
 		return nil
 	},
 }
 
-func buildDir(upper MutiFile, path []string) MutiFile {
-	if len(path) == 1 {
-		upper.Subs[path[0]] = MutiFile{
-			Type:      MFT_FILE,
-			Name:      path[0],
-			Size:      0,
-			Subs:      nil,
-			SubsOrder: nil,
+func formatSize(size int64) string {
+	s := float64(size)
+
+	index := 0
+	units := []string{"B", "KB", "MB", "GB"}
+	for ; index < 4; index++ {
+		if s < 1024 {
+			break
 		}
 
-		upper.SubsOrder = append(upper.SubsOrder, path[0])
-		return upper
+		s = s / 1024
 	}
 
-	var m MutiFile
-	if temp, ok := upper.Subs[path[0]]; ok {
-		m = temp
-	} else {
-		m = MutiFile{
-			Type:      MFT_DIRECTORY,
-			Name:      path[0],
-			Size:      0,
-			Subs:      make(map[string]MutiFile),
-			SubsOrder: make([]string, 0),
-		}
-	}
-	m = buildDir(m, path[1:])
-
-	upper.Subs[path[0]] = m
-	upper.SubsOrder = append(upper.SubsOrder, path[0])
-
-	return upper
+	return fmt.Sprintf("%.2f %s", s, units[index])
 }
 
-func p(f []dgotorrent.TorrentMutiFile) {
-	m := MutiFile{
-		Type:      MFT_DIRECTORY,
-		Name:      "root",
-		Size:      0,
-		Subs:      make(map[string]MutiFile),
-		SubsOrder: make([]string, 0),
+func printTree(tmf dgotorrent.TorrentMutiFile, prefixs []string, level int) {
+	if level == 0 {
+		fmt.Printf(". %s\n", tmf.Name)
 	}
 
-	for _, v := range f {
-		m = buildDir(m, v.Path)
-		fmt.Println(v.Path)
-		fmt.Println()
-	}
+	l := len(tmf.SubsOrder)
+	lprefix := strings.Join(prefixs, "")
+	for i, subName := range tmf.SubsOrder {
+		fmt.Print(lprefix)
 
-	j, _ := json.Marshal(m)
-	fmt.Println(string(j))
+		var sprefix string
+		if i == l-1 {
+			sprefix = "└── "
+		} else {
+			sprefix = "├── "
+		}
+		fmt.Print(sprefix)
+
+		sub := tmf.Subs[subName]
+		if sub.Type == dgotorrent.TMF_TYPE_DIRECTORY {
+			fmt.Printf("\033[1;96;40m%s\033[0m\n", sub.Name)
+		} else if sub.Type == dgotorrent.TMF_TYPE_FILE {
+
+			fmt.Printf("%s [%s]\n", sub.Name, formatSize(sub.Length))
+		} else {
+			dlog.Error(fmt.Errorf(""))
+		}
+
+		if sub.Type == dgotorrent.TMF_TYPE_DIRECTORY {
+			printTree(sub, append(prefixs, "│\u00A0\u00A0 "), level+1)
+		}
+	}
 }
 
 func init() {
 	rootCmd.AddCommand(treeCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// treeCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// treeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
