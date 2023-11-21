@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
 	cmdbencode "github.com/Dizzrt/dgo-torrent/bin/cmd/bencode"
 	"github.com/spf13/cobra"
@@ -16,7 +17,7 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "dgo-torrent",
+	Use:   filepath.Base(os.Args[0]),
 	Short: "This is a free and open source torrent downloader",
 	Long: `
 	This application is a free and open source torrent downloader that follows the MIT protocol.
