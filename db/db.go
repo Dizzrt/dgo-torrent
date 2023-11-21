@@ -10,13 +10,7 @@ import (
 )
 
 const (
-	path = ".data"
-
-	_CREATE_TABLE_WORKS = `
-		CREATE TABLE works (
-			id INT PRIMARY KEY NOT NULL,
-		);
-	`
+	dbFilePath = ".data"
 )
 
 var db *sql.DB
@@ -31,19 +25,18 @@ func isTableExists(tableName string) bool {
 
 	if rows.Next() {
 		return true
-	} else {
-		return false
 	}
+
+	return false
 }
 
 func initTables() {
-	// works
-	if !isTableExists("works") {
-		// _, err := db.Exec(_CREATE_TABLE_WORKS)
-		// if err != nil {
-		// 	dlog.Fatal(err)
-		// }
-		// TODO init db
+	// tasks
+	if !isTableExists("tasks") {
+		_, err := db.Exec(_SQL_CREATE_TABLE_TASKS)
+		if err != nil {
+			dlog.Fatal(err)
+		}
 	}
 }
 
@@ -54,7 +47,7 @@ func Init() {
 
 func DB() *sql.DB {
 	if db == nil || db.Ping() != nil {
-		_db, err := sql.Open("sqlite3", path)
+		_db, err := sql.Open("sqlite3", dbFilePath)
 		if err != nil {
 			dlog.Fatal(err)
 		}
