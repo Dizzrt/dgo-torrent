@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"os/user"
+	"path/filepath"
 
 	"github.com/Dizzrt/dgo-torrent/db"
 	"github.com/Dizzrt/dgo-torrent/dlog"
@@ -22,6 +24,8 @@ const (
 	_CONFIG_PATH = "./.dgo_torrent.toml"
 
 	KEY_PEER_ID = "client.peer_id"
+
+	KEY_DEFAULT_DOWNLOAD_PATH = "client.settings.default_download_path"
 )
 
 func init() {
@@ -99,4 +103,27 @@ func (cf *DConfig) GetPeerID() string {
 	}
 
 	return id
+}
+
+func (cf *DConfig) GetDefaultDonwloadPath() string {
+	if !config.IsSet(KEY_DEFAULT_DOWNLOAD_PATH) {
+		var path string
+		user, err := user.Current()
+		if err != nil {
+			path, err = os.Getwd()
+			if err != nil {
+				dlog.Fatalf("Failed to get default download path with error: %v", err)
+			}
+		} else {
+			path = filepath.Join(user.HomeDir, "Downloads")
+		}
+
+		config.Set(KEY_DEFAULT_DOWNLOAD_PATH, path)
+		config.WriteConfig()
+
+		return path
+	}
+
+	path := config.GetString(KEY_DEFAULT_DOWNLOAD_PATH)
+	return path
 }
