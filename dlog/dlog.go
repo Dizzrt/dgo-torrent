@@ -43,7 +43,7 @@ func Init() {
 		}
 
 		tee := zapcore.NewTee(cores...)
-		lg := zap.New(tee).WithOptions(zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+		lg := zap.New(tee).WithOptions(zap.AddCallerSkip(1), zap.AddStacktrace(zapcore.ErrorLevel))
 
 		logger = lg.Sugar()
 	})
