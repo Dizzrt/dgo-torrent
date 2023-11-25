@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	dgotorrent "github.com/Dizzrt/dgo-torrent"
+	"github.com/Dizzrt/dgo-torrent/config"
 	"github.com/Dizzrt/dgo-torrent/dlog"
 )
 
@@ -27,7 +28,7 @@ func TestDownload(t *testing.T) {
 	}
 
 	task := dgotorrent.TorrentTask{
-		PeerID:      dgotorrent.Config().GetPeerID(),
+		PeerID:      config.Instance().GetPeerID(),
 		Peers:       peers,
 		InfoHash:    tf.Info.Hash,
 		FileName:    "/Users/dizzrt/Downloads/debian.iso",
@@ -67,6 +68,10 @@ func unmarshaTorrentFile(filePath string, t string) error {
 	out.Write(jbytes)
 
 	return nil
+}
+
+func TestTest(t *testing.T) {
+	fmt.Println(config.Instance().GetDefaultDonwloadPath())
 }
 
 func TestTorrentFile(t *testing.T) {
@@ -155,7 +160,7 @@ func TestPeerConn(t *testing.T) {
 		go func(p dgotorrent.Peer) {
 			defer wg.Done()
 
-			pc, err := dgotorrent.NewConn(p, tf.Info.Hash, dgotorrent.Config().GetPeerID())
+			pc, err := dgotorrent.NewConn(p, tf.Info.Hash, config.Instance().GetPeerID())
 			if err != nil {
 				// t.Error(err)
 				dlog.Errorf("error: %v", err)

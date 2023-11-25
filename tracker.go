@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Dizzrt/dgo-torrent/bencode"
+	"github.com/Dizzrt/dgo-torrent/config"
 	"github.com/Dizzrt/dgo-torrent/dlog"
 )
 
@@ -95,7 +96,7 @@ func (tf *TorrentFile) buildHttpTrackerUrl(tracker string) (string, error) {
 		return "", err
 	}
 
-	peerID := Config().GetPeerID()
+	peerID := config.Instance().GetPeerID()
 	params := url.Values{
 		"info_hash":  []string{string(tf.Info.Hash[:])},
 		"peer_id":    []string{peerID},
@@ -203,7 +204,7 @@ func (tf *TorrentFile) buildUDPTrackerPackage(connectionID uint64, transactionID
 	binary.BigEndian.PutUint32(data[8:12], 1)
 	binary.BigEndian.PutUint32(data[12:16], transactionID)
 	copy(data[16:36], tf.Info.Hash[:])
-	copy(data[36:56], Config().GetPeerID())
+	copy(data[36:56], config.Instance().GetPeerID())
 	binary.BigEndian.PutUint64(data[56:64], 0)
 	binary.BigEndian.PutUint64(data[64:72], uint64(tf.Info.Length))
 	binary.BigEndian.PutUint64(data[72:80], 0)
