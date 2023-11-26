@@ -43,7 +43,7 @@ type TorrentInfo struct {
 	Length      int64
 	MutiFiles   TorrentMutiFile
 	PieceLength int64
-	Pieces      [][PIECE_LEN]byte
+	PieceHashes [][PIECE_LEN]byte
 	Hash        [INFO_HASH_LEN]byte
 }
 
@@ -271,7 +271,7 @@ func parseInfo(tf *TorrentFile, infoMap map[string]any) error {
 			for i := 0; i < count; i++ {
 				copy(pieces[i][:], raw[i*PIECE_LEN:(i+1)*PIECE_LEN])
 			}
-			info.Pieces = pieces
+			info.PieceHashes = pieces
 		} else {
 			return ErrInvalidTorrentFile
 		}

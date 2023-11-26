@@ -48,7 +48,7 @@ var readCmd = &cobra.Command{
 		}
 
 		if !withPieces {
-			tf.Info.Pieces = make([][20]byte, 0)
+			tf.Info.PieceHashes = make([][20]byte, 0)
 		}
 
 		res, err := json.Marshal(tf)

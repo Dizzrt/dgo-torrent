@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	dgotorrent "github.com/Dizzrt/dgo-torrent"
 	"github.com/Dizzrt/dgo-torrent/config"
@@ -22,22 +23,37 @@ func TestDownload(t *testing.T) {
 		t.Error(err)
 	}
 
-	peers, err := tf.FindPeers()
-	if err != nil {
-		t.Error(err)
+	task := &dgotorrent.Task{
+		ID:        1,
+		Name:      tf.Info.Name,
+		Path:      config.Instance().GetDefaultDonwloadPath(),
+		Status:    make(map[string]any),
+		State:     dgotorrent.TASK_STATE_PAUSED,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		PeerID:    config.Instance().GetPeerID(),
+		Torrent:   *tf,
 	}
 
-	task := dgotorrent.TorrentTask{
-		PeerID:      config.Instance().GetPeerID(),
-		Peers:       peers,
-		InfoHash:    tf.Info.Hash,
-		FileName:    "/Users/dizzrt/Downloads/debian.iso",
-		FileLength:  int(tf.Info.Length),
-		PieceLength: int(tf.Info.PieceLength),
-		PiecesHash:  tf.Info.Pieces,
-	}
+	process := dgotorrent.NewProcess(task)
+	process.Start()
 
-	dgotorrent.Download(&task)
+	// peers, err := tf.FindPeers()
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+
+	// task := dgotorrent.TorrentTask{
+	// 	PeerID:      config.Instance().GetPeerID(),
+	// 	Peers:       peers,
+	// 	InfoHash:    tf.Info.Hash,
+	// 	FileName:    "/Users/dizzrt/Downloads/debian.iso",
+	// 	FileLength:  int(tf.Info.Length),
+	// 	PieceLength: int(tf.Info.PieceLength),
+	// 	PiecesHash:  tf.Info.PieceHashes,
+	// }
+
+	// dgotorrent.Download(&task)
 	dlog.L().Sync()
 }
 
