@@ -3,13 +3,14 @@ package dgotorrent
 import (
 	"bytes"
 	"crypto/sha1"
-	"fmt"
+	"io"
 	"os"
 	"path"
 	"sync"
 	"time"
 
 	"github.com/Dizzrt/dgo-torrent/dlog"
+	"github.com/schollz/progressbar/v3"
 )
 
 const (
@@ -90,6 +91,8 @@ func (p *Process) Start() error {
 		go p.peerRoutine(peer, jobs, results)
 	}
 
+	bar := progressbar.DefaultBytes(p.Task.Torrent.Info.Length, "downloading")
+
 	// copy data
 	count := 0
 	buf := make([]byte, p.Task.Torrent.Info.Length)
@@ -99,8 +102,10 @@ func (p *Process) Start() error {
 		copy(buf[begin:end], res.data)
 		count++
 
-		percent := float64(count) / float64(len(p.Task.Torrent.Info.PieceHashes)) * 100
-		fmt.Printf("downloading progress: %0.2f%%\n", percent)
+		io.Copy(bar, bytes.NewReader(res.data))
+		// io.Copy(io.MultiWriter(bar), bytes.NewReader(res.data))
+		// percent := float64(count) / float64(len(p.Task.Torrent.Info.PieceHashes)) * 100
+		// fmt.Printf("downloading progress: %0.2f%%\n", percent)
 	}
 
 	close(jobs)
