@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Dizzrt/dgo-torrent/bencode"
@@ -260,9 +259,10 @@ func (tf *TorrentFile) requestUdpTrackers(udpTrackers []string) ([]TrackerResp, 
 				return
 			}
 
-			if flags&syscall.MSG_TRUNC != 0 {
-				dlog.Warn("Truncated peers")
-			}
+			dlog.Info(flags)
+			// if flags&syscall.MSG_TRUNC != 0 {
+			// 	dlog.Warn("Truncated peers")
+			// }
 
 			x := (n - 20) / 6 * 6
 			if x <= 0 {

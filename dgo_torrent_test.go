@@ -91,7 +91,7 @@ func TestTest(t *testing.T) {
 }
 
 func TestTorrentFile(t *testing.T) {
-	if err := unmarshaTorrentFile("test/debian.torrent", "debian"); err != nil {
+	if err := unmarshaTorrentFile("test/mutiFile.torrent", "muti"); err != nil {
 		t.Error(err)
 	}
 

@@ -24,6 +24,21 @@ const (
 	TMF_TYPE_FILE
 )
 
+// type TorrentMutiFIleType uint8
+
+// const (
+// 	TMFT_DIRECTORY = iota
+// 	TMFT_FILE
+// )
+
+// type TorrentMutiFile struct {
+// 	Type      TorrentMutiFIleType
+// 	Name      string
+// 	Size      int64
+// 	Subs      map[string]TorrentMutiFile
+// 	SubsOrder []string
+// }
+
 type TorrentMutiFile struct {
 	Type      TMF_TYPE
 	Name      string
